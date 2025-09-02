@@ -175,7 +175,7 @@ Using data from [MassEnviroScreen](https://profluna.github.io/MassEnviroScreen/)
 QUESTIONS:
 
 - Do we want to see indicators for all 14 block groups, or just the BA?
-- 
+- Do we flag 50th percentile for all 14 block groups, or just the BA?
 
 ```{r}
 #| echo: false
