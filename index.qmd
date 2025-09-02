@@ -176,6 +176,7 @@ QUESTIONS:
 
 - Do we want to see indicators for all 14 block groups, or just the BA?
 - Do we flag 50th percentile for all 14 block groups, or just the BA?
+- Assuming we want a report for all 14 block groups, does this mean 14 separate lists, or a single combined list with some kind of average value for the whole SGA?
 
 ```{r}
 #| echo: false
@@ -218,3 +219,4 @@ QUESTIONS:
 - Do we want to see key indicators for all 14 block groups, or just the BA?
 - Do we flag 50th percentile for all 14 block groups, or just the BA?
 - How do we determine the level of impact on any indicator? Does EFSB have metrics of impacts?
+- - Assuming we want a report for all 14 block groups, does this mean 14 separate lists, or a single combined list with some kind of average value for the whole SGA?
