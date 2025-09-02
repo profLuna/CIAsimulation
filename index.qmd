@@ -213,3 +213,8 @@ read_xlsx("data/CIA Indicators by Technology 08-01-25.xlsx",
   scroll_box(width = "100%", height = "500px")
 ```
 
+QUESTIONS:
+
+- Do we want to see key indicators for all 14 block groups, or just the BA?
+- Do we flag 50th percentile for all 14 block groups, or just the BA?
+- How do we determine the level of impact on any indicator? Does EFSB have metrics of impacts?
