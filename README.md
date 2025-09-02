@@ -1,1 +1,1 @@
-This is a simulation of the Cumulative Impact Assessment process for the Sudbury-Hudson transmission project. 
+This is a simulation of the Cumulative Impact Assessment process for the Sudbury-Hudson transmission project. A webpage showing the full analysis is available at \<<https://profluna.github.io/CIAsimulation/>\>.
