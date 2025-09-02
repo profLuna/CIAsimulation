@@ -168,7 +168,7 @@ leaflet() %>%
 @fig-sga shows that the SGA of the Sudbury-Hudson transmission line intersects with `{r} nrow(BGs)` census block groups, including `{r} nrow(UBAbgs)` block group designated as BA. Based on guidance, the project would require a CIA. 
 
 
-### Step 3. Catalog indicators within SGA
+### Step 3. Catalog Indicators within SGA
 
 Using data from [MassEnviroScreen](https://profluna.github.io/MassEnviroScreen/), the project applicant must document the values of all the indicators which inform the cumulative impact score. They must highlight all current indicators which exceed the 50th percentile for the specific indicator. This comprehensive inventory establishes the baseline conditions that will be used to assess the project’s incremental impact.
 
@@ -184,5 +184,32 @@ QUESTIONS:
 #| label: tab-bgs
 
 
+```
+
+
+### Step 4. Identify Impacts on Key Indicators
+
+Using the list of relevant, technology-specific indicators established by the EFSB, the project applicant must assess and document the anticipated impact of the proposed project on each indicator within the SGA. The project applicant must determine whether the project will exacerbate any indicator that already exceeds the 50th percentile statewide threshold or cause any additional indicator to exceed the 50th percentile threshold. If either condition is met, the impact is considered a disproportionate adverse effect for that indicator.
+
+@tbl-kpi below lists the key indicators by technology type as identified by the EFSB.
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-kpi
+
+library(readxl)
+
+read_xlsx("data/CIA Indicators by Technology 08-01-25.xlsx", 
+                 sheet = "Cumul Ind by E-Tech", skip = 6) %>% 
+  filter(!is.na(`Impact Category`) & `Impact Category` != "Site Suitability") %>% 
+  select(-`Comments (Rationale for Inclusion)`) %>% 
+  kbl("html", escape = FALSE, 
+      caption = "Key Indicators by Technology Type", 
+      col.names = c("Impact Category", "Sub-Category", "Indicator", 
+                    "Clean Transmission and Distribution", "Clean Energy Generation",
+                    "Clean Energy Storage", "Fossil Fuel (Legacy Facilities) - All Types")) %>% 
+  kable_styling() %>% 
+  scroll_box(width = "100%", height = "500px")
 ```
 
