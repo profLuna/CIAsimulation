@@ -232,15 +232,14 @@ leaflet() %>%
 
 Using data from [MassEnviroScreen](https://profluna.github.io/MassEnviroScreen/), the project applicant must document the values of all the indicators which inform the cumulative impact score. They must highlight all current indicators which exceed the 50th percentile for the specific indicator. This comprehensive inventory establishes the baseline conditions that will be used to assess the project’s incremental impact.
 
-@tab-bgs shows the MassEnviroScreen indicator values for the Burdened Area within the SGA. Items in red exceed either the statewide 50th percentile, or the 50th percentile for non-Burdened Areas. 
+@tbl-bgs shows the MassEnviroScreen indicator values for the Burdened Area within the SGA. Items in red exceed either the statewide 50th percentile, or the 50th percentile for non-Burdened Areas. 
 
 ```{r}
 #| echo: false
 #| warning: false
-#| message: false
-#| label: tab-bgs
+#| label: tbl-bgs
 
-# create table showing raw values and percnetiles for BA
+# create table showing raw values and percentiles for BA
 # select relevant variables
 indiRaw <- UBAbgs %>% 
   st_drop_geometry() %>% 
@@ -311,6 +310,62 @@ read_xlsx("data/CIA Indicators by Technology 08-01-25.xlsx",
 QUESTIONS:
 
 - How do we determine the level of anticipated impact on any indicator?
+- How do we want to quantify that impact to determine if it creates a 
 
 
-### Statewide Assessment of Thresholds
+### Sensitivity of Baseline Conditions
+
+Following the proposed regulations by OEJE, there are two ways to set baseline conditions for determining a disproportionate adverse effect:
+
+- comparison against the statewide 50th percentile for a given indicator
+- comparison against the 50th percentile for non-Burdened Areas
+
+We can explore the significance of these choices by looking at the frequency of 50th percentile exceedances for Burdened Areas in MassEnviroScreen. In other words, how often do Burdened Areas in MassEnviroScreen exceed the 50th percentile when the statewide baseline is used? How often do they exceed the 50th percentile when the baseline is based on non-Burdened Areas?
+
+@tbl-baseline shows statistics on frequency of exceedances using these different baselines. Values indicate the number of exceedances by census block group. For example, using the statewide baseline, the smallest number of exceedances for a burdened area block group is 4 exceedances, and maximum is 27. In comaparison, using the non-Burdened Area baseline, the smallest number of exceedances is 6, and the maximum is also 27. 
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-baseline
+
+# create table showing stats on frequency of exceedances based on benchmark
+stateBM <- MES %>% 
+  st_drop_geometry() %>% 
+  filter(UBA == "Yes") %>% 
+  summarise(across(GT_BAcnt, .fns = 
+                   list(min = ~min(.x, na.rm = TRUE),
+                        median = ~median(.x, na.rm = TRUE),
+                        mean = ~mean(.x, na.rm = TRUE),
+                        stdev = ~sd(.x, na.rm = TRUE),
+                        q25 = ~quantile(., 0.25),
+                        q75 = ~quantile(., 0.75),
+                        max = ~max(.x, na.rm = TRUE)))) %>% 
+  pivot_longer(everything(), names_sep='cnt_', names_to=c('variable', '.value')) %>% 
+  pivot_longer(cols = min:max, names_to = "Statistic", values_to = "Statewide")
+
+nonBABM <- MES %>% 
+  st_drop_geometry() %>% 
+  filter(UBA == "Yes") %>% 
+  summarise(across(GTnonBAcnt, .fns = 
+                     list(min = min,
+                          median = median,
+                          mean = mean,
+                          stdev = sd,
+                          q25 = ~quantile(., 0.25),
+                          q75 = ~quantile(., 0.75),
+                          max = max))) %>% 
+  pivot_longer(everything(), names_sep='_', names_to=c('variable', '.value')) %>% 
+  pivot_longer(cols = min:max, names_to = "Statistic", values_to = "nonBA")
+
+# bring them together in table
+bind_cols(select(stateBM, Statistic, Statewide), select(nonBABM, nonBA)) %>% 
+  mutate(Statewide = round(Statewide, 1),
+         nonBA = round(nonBA, 1)) %>% 
+  kbl("html", escape = FALSE, 
+      caption = "Exceedances from Statewide versus non-Burdened Area Baselines", 
+      col.names = c("Statistic", "Statewide","Non-Burdened Areas")) %>% 
+  kable_styling()
+```
+
+
