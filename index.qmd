@@ -61,6 +61,66 @@ MES <- readRDS("../MassEnviroScreen/MassEnviroScreen.rds") %>%
   replace_na(list(UBA = "No")) %>% 
   mutate(NAME2 = paste0(str_remove(NAME, ", Middlesex County"),", ", COSUB))
 
+# Set flag for indicators that exceed statewide median, as well as median of non-UBAs, in UBAs
+# Want a count of how many indicators exceed these thresholds, possibly summarized by BG, as well as by indicator
+nonBA50th <- MES %>% 
+  st_drop_geometry() %>% 
+  filter(UBA == "No") %>% 
+  summarize(across(c(PM25, OZONE, DSLPM, NO2, PTRAF, DWATER, CancerRisk, `Respiratory HI`, 
+                     cleanup_score, gwater_score, BWPScore, SWScore, IL_count, 
+                     `High blood pressure among adults`, `Coronary heart disease among adults`, 
+                     `Chronic obstructive pulmonary disease among adults`, 
+                     `Cancer (non-skin) or melanoma among adults`, pedAsthmaPrevalence, BLL, 
+                     LBW, PMR, HSlesspctE, hhburden, limitEngpctE, povHHpctE, unemploypctE, 
+                     droughtSum, WHPmean, pctFldArea, Heatmean), 
+                   ~ median(.x, na.rm = TRUE)))
+# Add variables with flags for those exceeding non-UBA median
+MES <- MES %>% 
+  mutate(nonEXPpctilePM25 = if_else(PM25 > nonBA50th[1,"PM25"], 1, 0),
+         nonEXPpctileOZONE = if_else(OZONE > nonBA50th[1,"OZONE"], 1, 0),
+         nonEXPpctileDSLPM = if_else(DSLPM > nonBA50th[1,"DSLPM"], 1, 0),
+         nonEXPpctileNO2 = if_else(NO2 > nonBA50th[1,"NO2"], 1, 0),
+         nonEXPpctilePTRAF = if_else(PTRAF > nonBA50th[1,"PTRAF"], 1, 0),
+         nonEXPpctileDWATER = if_else(DWATER > nonBA50th[1,"DWATER"], 1, 0),
+         nonEXPpctileCancerRisk = if_else(CancerRisk > nonBA50th[1,"CancerRisk"], 1, 0),
+         nonEXPpctileRespHI = if_else(`Respiratory HI` > nonBA50th[1,"Respiratory HI"], 1, 0),
+         nonEFFCTpctileCleanup = if_else(cleanup_score > nonBA50th[1,"cleanup_score"], 1, 0),
+         nonEFFCTpctileGrndWater = if_else(gwater_score > nonBA50th[1,"gwater_score"], 1, 0),
+         nonEFFCTpctileBWPMAJOR_PT = if_else(BWPScore > nonBA50th[1,"BWPScore"], 1, 0),
+         nonEFFCTpctileSW = if_else(SWScore > nonBA50th[1,"SWScore"], 1, 0),
+         nonEFFCTpctileIL = if_else(IL_count > nonBA50th[1,"IL_count"], 1, 0),
+         nonSPpctileHPRSSR = if_else(`High blood pressure among adults` > nonBA50th[1,"High blood pressure among adults"], 1, 0),
+         nonSPpctileHRTDIS = if_else(`Coronary heart disease among adults` > nonBA50th[1,"Coronary heart disease among adults"], 1, 0),
+         nonSPpctileCOPD = if_else(`Chronic obstructive pulmonary disease among adults` > nonBA50th[1,"Chronic obstructive pulmonary disease among adults"], 1, 0),
+         nonSPpctileCANCER = if_else(`Cancer (non-skin) or melanoma among adults` > nonBA50th[1,"Cancer (non-skin) or melanoma among adults"], 1, 0),
+         nonSPpctileAsthmaPed = if_else(pedAsthmaPrevalence > nonBA50th[1,"pedAsthmaPrevalence"], 1, 0),
+         nonSPpctileBLL = if_else(BLL > nonBA50th[1,"BLL"], 1, 0),
+         nonSPpctileLBW = if_else(LBW > nonBA50th[1,"LBW"], 1, 0),
+         nonSPpctilePMR = if_else(PMR > nonBA50th[1,"PMR"], 1, 0),
+         nonSEpctileHS = if_else(HSlesspctE > nonBA50th[1,"HSlesspctE"], 1, 0),
+         nonSEpctileHHB = if_else(hhburden > nonBA50th[1,"hhburden"], 1, 0),
+         nonSEpctileLEP = if_else(limitEngpctE > nonBA50th[1,"limitEngpctE"], 1, 0),
+         nonSEpctilePOV = if_else(povHHpctE > nonBA50th[1,"povHHpctE"], 1, 0),
+         nonSEpctileEMP = if_else(unemploypctE > nonBA50th[1,"unemploypctE"], 1, 0),
+         nonCLIMpctilDrought = if_else(droughtSum > nonBA50th[1,"droughtSum"], 1, 0),
+         nonCLIMpctilWHP = if_else(WHPmean > nonBA50th[1,"WHPmean"], 1, 0),
+         nonCLIMpctilFLD = if_else(pctFldArea > nonBA50th[1,"pctFldArea"], 1, 0),
+         nonCLIMpctilHEAT = if_else(Heatmean > nonBA50th[1,"Heatmean"], 1, 0)) %>% 
+  rowwise() %>% 
+  mutate(GT_BAcntEXP = sum(c_across(starts_with("EXP")) > 50, na.rm = TRUE),
+         GT_BAcntEFFCT = sum(c_across(starts_with("EFFCT")) > 50, na.rm = TRUE),
+         GT_BAcntSP = sum(c_across(starts_with("SP")) > 50, na.rm = TRUE),
+         GT_BAcntSE = sum(c_across(starts_with("SE")) > 50, na.rm = TRUE),
+         GT_BAcntCLIM = sum(c_across(starts_with("CLIM")) > 50, na.rm = TRUE),
+         GT_BAcnt = sum(c_across(starts_with("GT_BA")), na.rm = TRUE),
+         GTnonBAcntEXP = sum(c_across(starts_with("nonEXP")), na.rm = TRUE),
+         GTnonBAcntEFFCT = sum(c_across(starts_with("nonEFFCT")), na.rm = TRUE),
+         GTnonBAcntSP = sum(c_across(starts_with("nonSP")), na.rm = TRUE),
+         GTnonBAcntSE = sum(c_across(starts_with("nonSE")), na.rm = TRUE),
+         GTnonBAcntCLIM = sum(c_across(starts_with("nonCLIM")), na.rm = TRUE),
+         GTnonBAcnt = sum(c_across(starts_with("GTnonBA")), na.rm = TRUE)) %>% 
+  ungroup()
+
 # load project shapefile and create 1/4 mile buffer
 SRT <- st_read("data/Sudbury_rail_rte.shp", quiet = TRUE) %>% 
   st_make_valid()
@@ -172,11 +232,7 @@ leaflet() %>%
 
 Using data from [MassEnviroScreen](https://profluna.github.io/MassEnviroScreen/), the project applicant must document the values of all the indicators which inform the cumulative impact score. They must highlight all current indicators which exceed the 50th percentile for the specific indicator. This comprehensive inventory establishes the baseline conditions that will be used to assess the project’s incremental impact.
 
-QUESTIONS:
-
-- Do we want to see indicators for all 14 block groups, or just the BA?
-- Do we flag 50th percentile for all 14 block groups, or just the BA?
-- Assuming we want a report for all 14 block groups, does this mean 14 separate lists, or a single combined list with some kind of average value for the whole SGA?
+@tab-bgs shows the MassEnviroScreen indicator values for the Burdened Area within the SGA. Items in red exceed either the statewide 50th percentile, or the 50th percentile for non-Burdened Areas. 
 
 ```{r}
 #| echo: false
@@ -184,7 +240,45 @@ QUESTIONS:
 #| message: false
 #| label: tab-bgs
 
+# create table showing raw values and percnetiles for BA
+# select relevant variables
+indiRaw <- UBAbgs %>% 
+  st_drop_geometry() %>% 
+  select(PM25, EXPpctilePM25, OZONE, EXPpctileOZONE, DSLPM, EXPpctileDSLPM, NO2, EXPpctileNO2, PTRAF, EXPpctilePTRAF, DWATER, EXPpctileDWATER, CancerRisk, EXPpctileCancerRisk, `Respiratory HI`, EXPpctileRespHI, cleanup_score, EFFCTpctileCleanup, gwater_score, EFFCTpctileGrndWater, BWPScore, EFFCTpctileBWPMAJOR_PT, SWScore, EFFCTpctileSW, IL_count, EFFCTpctileIL, `High blood pressure among adults`, SPpctileHPRSSR, `Coronary heart disease among adults`, SPpctileHRTDIS, `Chronic obstructive pulmonary disease among adults`, SPpctileCOPD, `Cancer (non-skin) or melanoma among adults`, SPpctileCANCER, pedAsthmaPrevalence, SPpctileAsthmaPed, BLL, SPpctileBLL, LBW, SPpctileLBW, PMR, SPpctilePMR, HSlesspctE, SEpctileHS, hhburden, SEpctileHHB, limitEngpctE, SEpctileLEP, povHHpctE, SEpctilePOV, unemploypctE, SEpctileEMP, droughtSum, CLIMpctilDrought, WHPmean, CLIMpctilWHP, pctFldArea, CLIMpctilFLD, Heatmean, CLIMpctilHEAT) %>% 
+  select(-starts_with("EXP"), -starts_with("EFFCT"), -starts_with("SP"), -starts_with("SE"), 
+         -starts_with("CLIM")) %>% 
+  pivot_longer(cols = everything(), names_to = "indicator", values_to = "RawValue")
 
+# select only percentile 
+indiNorm <- UBAbgs %>% 
+  st_drop_geometry() %>% 
+  select(starts_with("EXP"), starts_with("EFFCT"), starts_with("SP"), starts_with("SE"), 
+         starts_with("CLIM")) %>% 
+  pivot_longer(cols = everything(), names_to = "indicator", values_to = "Percentile")
+
+# select non-UBA flags
+indiNonFlag <- UBAbgs %>% 
+  st_drop_geometry() %>% 
+  select(starts_with("nonEXP"), starts_with("nonEFFCT"), starts_with("nonSP"), 
+         starts_with("nonSE"), starts_with("nonCLIM")) %>% 
+  pivot_longer(cols = everything(), names_to = "indicator", values_to = "nonBAflag") %>% 
+  mutate(nonBAflag = if_else(nonBAflag == 1, "Yes", "No"))
+
+bind_cols(indiRaw, select(indiNorm, Percentile)) %>% 
+  bind_cols(., select(indiNonFlag, nonBAflag)) %>% 
+  mutate(RawValue = round(RawValue,2),
+         Percentile = round(Percentile,1)) %>% 
+  mutate(Percentile = cell_spec(Percentile, color = case_when(
+    Percentile > 50 ~ "red",
+    .default = "black")),
+    nonBAflag = cell_spec(nonBAflag, color = case_when(
+      nonBAflag == "Yes" ~ "red",
+      .default = "black"))) %>%
+  kbl("html", escape = FALSE, 
+      caption = "MassEnviroScreen Indicators for Burdened Area within SGA", 
+      col.names = c("Indicator", "Raw Value", "Statewide Percentile", "Exceeds 50th Percentile for non-Burdened Areas?")) %>% 
+  kable_styling() %>% 
+  scroll_box(width = "100%", height = "500px")
 ```
 
 
@@ -216,7 +310,7 @@ read_xlsx("data/CIA Indicators by Technology 08-01-25.xlsx",
 
 QUESTIONS:
 
-- Do we want to see key indicators for all 14 block groups, or just the BA?
-- Do we flag 50th percentile for all 14 block groups, or just the BA?
-- How do we determine the level of impact on any indicator? Does EFSB have metrics of impacts?
-- - Assuming we want a report for all 14 block groups, does this mean 14 separate lists, or a single combined list with some kind of average value for the whole SGA?
+- How do we determine the level of anticipated impact on any indicator?
+
+
+### Statewide Assessment of Thresholds
