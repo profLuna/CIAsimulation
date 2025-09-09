@@ -369,3 +369,68 @@ bind_cols(select(stateBM, Statistic, Statewide), select(nonBABM, nonBA)) %>%
 ```
 
 
+We can also map the exceedances to explore whethere there are significant differences in the geographic distribution of exceedances. 
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| label: fig-baselines
+
+# create map with comparison of baseline choices
+addLayersControl(
+    # baseGroups are toggle radio buttons; only 1 at at time
+    baseGroups = c("Unfairly Burdened Areas", "MassEnviroScore"),
+    # overlayGroups are checkbox layers that can all be on or off
+    overlayGroups = c("MA EJ Populations", "city/town boundary"),
+    options = layersControlOptions(
+      collapsed = FALSE,
+      autoZIndex = TRUE)) %>% 
+  hideGroup(c("MA EJ Populations", "city/town boundary")) %>% 
+  addLegend(position = "bottomright",  
+            colors = "red", 
+            opacity = 0.5,
+            title = "MassEnviroScreen",
+            labels = "Unfairly Burdened Areas",
+            layerId = "Unfairly Burdened Areas") %>% 
+  addLegend(position = "bottomright",  
+            pal = MESpal, 
+            values = MassEnviroScreen$MassEnviroScore,
+            opacity = 0.5,
+            title = "MassEnviroScore",
+            # labels = "MassEnviroScore",
+            layerId = "MassEnviroScore") %>%
+  addLegend(position = "bottomright",  
+            colors = "gray", 
+            opacity = 0.3,
+            # title = "MA EJ Population",
+            labels = "MA EJ Populations",
+            group = "MA EJ Populations") %>% 
+  addSearchOSM() %>% 
+  # A hack to have the legends associated with radio-button "Base Groups" in R leaflet maps toggle along with layers. see https://gist.github.com/noamross/98c2053d81085517e686407096ec0a69
+  htmlwidgets::onRender("
+    function(el, x) {
+      var initialLegend = 'Unfairly Burdened Areas' // Set the initial legend to be displayed by layerId
+      var myMap = this;
+      for (var legend in myMap.controls._controlsById) {
+        var el = myMap.controls.get(legend.toString())._container;
+        if(legend.toString() === initialLegend) {
+          el.style.display = 'block';
+        } else {
+          el.style.display = 'none';
+        };
+      };
+    myMap.on('baselayerchange',
+      function (layer) {
+        for (var legend in myMap.controls._controlsById) {
+          var el = myMap.controls.get(legend.toString())._container;
+          if(legend.toString() === layer.name) {
+            el.style.display = 'block';
+          } else {
+            el.style.display = 'none';
+          };
+        };
+      });
+    }")
+```
+
