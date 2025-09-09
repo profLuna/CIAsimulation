@@ -255,27 +255,55 @@ indiNorm <- UBAbgs %>%
          starts_with("CLIM")) %>% 
   pivot_longer(cols = everything(), names_to = "indicator", values_to = "Percentile")
 
-# select non-UBA flags
-indiNonFlag <- UBAbgs %>% 
-  st_drop_geometry() %>% 
-  select(starts_with("nonEXP"), starts_with("nonEFFCT"), starts_with("nonSP"), 
-         starts_with("nonSE"), starts_with("nonCLIM")) %>% 
-  pivot_longer(cols = everything(), names_to = "indicator", values_to = "nonBAflag") %>% 
-  mutate(nonBAflag = if_else(nonBAflag == 1, "Yes", "No"))
+# # select non-UBA flags
+# indiNonFlag <- UBAbgs %>% 
+#   st_drop_geometry() %>% 
+#   select(starts_with("nonEXP"), starts_with("nonEFFCT"), starts_with("nonSP"), 
+#          starts_with("nonSE"), starts_with("nonCLIM")) %>% 
+#   pivot_longer(cols = everything(), names_to = "indicator", values_to = "nonBAflag") %>% 
+#   mutate(nonBAflag = if_else(nonBAflag == 1, "Yes", "No"))
 
-bind_cols(indiRaw, select(indiNorm, Percentile)) %>% 
-  bind_cols(., select(indiNonFlag, nonBAflag)) %>% 
+# compute non-BA percentiles, including UBAbgs
+nonBApctile <- MES %>% 
+  st_drop_geometry() %>% 
+  filter(UBA == "No") %>% 
+  select(UBA, PM25, OZONE, DSLPM, NO2, PTRAF, DWATER, CancerRisk, `Respiratory HI`, 
+         cleanup_score, gwater_score, BWPScore, SWScore, IL_count, 
+         `High blood pressure among adults`, `Coronary heart disease among adults`, 
+         `Chronic obstructive pulmonary disease among adults`, 
+         `Cancer (non-skin) or melanoma among adults`, pedAsthmaPrevalence, BLL, 
+         LBW, PMR, HSlesspctE, hhburden, limitEngpctE, povHHpctE, unemploypctE, 
+         droughtSum, WHPmean, pctFldArea, Heatmean) %>% 
+  bind_rows(select(st_drop_geometry(UBAbgs), names(.)), .) %>% 
+  mutate(across(.cols = -UBA, ~ percent_rank(.x)*100, .names = "pctile{.col}"))
+
+# isolate UBA with nonUBA percentiles
+BAnonBApctile <- nonBApctile %>% 
+  filter(UBA == "Yes") %>% 
+  select(starts_with("pctile")) %>% 
+  pivot_longer(cols = everything(), names_to = "indicator", values_to = "PercentileNBA")
+
+# put table together
+BAscores <- bind_cols(indiRaw, select(indiNorm, Percentile)) %>% 
+  bind_cols(., select(BAnonBApctile, PercentileNBA)) %>% 
   mutate(RawValue = round(RawValue,2),
-         Percentile = round(Percentile,1)) %>% 
+         Percentile = round(Percentile,1),
+         PercentileNBA = round(PercentileNBA,1)) %>% 
   mutate(Percentile = cell_spec(Percentile, color = case_when(
     Percentile > 50 ~ "red",
     .default = "black")),
-    nonBAflag = cell_spec(nonBAflag, color = case_when(
-      nonBAflag == "Yes" ~ "red",
-      .default = "black"))) %>%
+    # nonBAflag = cell_spec(nonBAflag, color = case_when(
+    #   nonBAflag == "Yes" ~ "red",
+    #   .default = "black")),
+    PercentileNBA = cell_spec(PercentileNBA, color = case_when(
+    PercentileNBA > 50 ~ "red",
+    .default = "black")))
+
+BAscores %>% 
   kbl("html", escape = FALSE, 
       caption = "MassEnviroScreen Indicators for Burdened Area within SGA", 
-      col.names = c("Indicator", "Raw Value", "Statewide Percentile", "Exceeds 50th Percentile for non-Burdened Areas?")) %>% 
+      col.names = c("Indicator", "Raw Value", "Statewide Percentile", 
+                    "non-Burdened Area Percentile")) %>% 
   kable_styling() %>% 
   scroll_box(width = "100%", height = "500px")
 ```
@@ -307,10 +335,84 @@ read_xlsx("data/CIA Indicators by Technology 08-01-25.xlsx",
   scroll_box(width = "100%", height = "500px")
 ```
 
-QUESTIONS:
+In the absence of accepted methods for estimating or modeling expected impacts on key indicators, one way of quantifying the level of potential impact is to use expert judgment as exemplified by the Project Impact Factor (PIF) proposed by EFSB. At its broadest level, the PIF strategy conceptualizes impacts on a continuum, ranging from "major burdens" to "no discernible impact" to "major benefits." These impacts are compensable, such that benefits can mathematically offset burdens, and vice versa. This approach can be further subdivided into two phases: the construction phase and the operation phase. The operation phase is weighted more heavily because the effects endure over a longer time period. While the determination of level of impact (e.g., "moderate" or "major" burden) should be based on expert judgment, the numerical value assigned to a given level of impact is essentially arbitrary. However, given the four levels of impact proposed by EFSB, a logical approach to quantification would be to use quartiles - 1, 0.75, 0.5, and 0.25. If the construction phase is conceived as having half the impact of the operation phase, these quartile values can be broken into complementary values, such that the construction phase value is half that of the operation phase value, and the sum of both equals the respective quartile. To achieve this, Construction phase values are computed as 1/3 of the quartile values for a given level, and Operation phase values are computed as 2/3 of the quartile value for a given level. The latter ensure that the construction phase values are one-half that of the operation phase values, and the sum of these complementary values adds up to the quartile value of a given level (see @tbl-impact). 
 
-- How do we determine the level of anticipated impact on any indicator?
-- How do we want to quantify that impact to determine if it creates a 
+phaseC = 1/3 * quartile level value
+
+phaseO = 2/3 * quartile level value
+
+phaseC + phaseO = quartile value
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-impact
+
+# table illustrating concept of PIF by quartiles with half-weighting for construction phase
+data.frame(impact = c("Major Benefits", "Moderate Benefits", "Minor Benefits", 
+                      "Negligible Benefits", "No Discernible Project Benefits or Burdens", 
+                      "Negligible Burdens", "Minor Burdens","Moderate Burdens", "Major Burdens"),
+phaseC = c(rev(round(seq(from = 0.25, to = 1, by = 0.25)*(1/3),2)*-1), 0, 
+           round(seq(from = 0.25, to = 1, by = 0.25)*(1/3),2)), 
+phaseO = c(rev(round(seq(from = 0.25, to = 1, by = 0.25)*(2/3),2)*-1), 0, 
+           round(seq(from = 0.25, to = 1, by = 0.25)*(2/3),2))) %>% 
+  mutate(qsum = phaseC+phaseO) %>% 
+  kbl("html", escape = FALSE, 
+      caption = "Key Indicator Impact Levels", 
+      col.names = c("Impact Level", "Construction Phase", "Operation Phase", "Quartile Sum")) %>%
+  kable_styling()
+```
+
+According to OEJE guidance, "A disproportionate adverse effect occurs when the project exacerbates already high-impact indicators or pushes others beyond critical thresholds." This statement can be interpreted to mean the following:
+
+1. If a project adds to a burden that is already above the critical threshold in a Burdened Area (e.g., 50th percentile), it is by definition exacerbating an already high-impact indicator - a disproportionate adverse effect
+2. If a project pushes or raises an indicator beyond a critical threshold in a Burdened Area (e.g., 50th percentile), it creates a disproportionate adverse effect
+
+Item 1 is essentially a threshold situation. Adding burden to an indicator that already exceeds the critical threshold in a Burdened Area is ipso facto a disproportionate adverse effect. In other words, the project is adding inequitable levels of burden on a key indicator to an already overburdened community. If we are reluctant to accept such trigger, we could declare that impacts must have a "minor" or greater burden to trigger such a determination. 
+
+Item 2 is more complicated. How do we quantify the incremental impact of a burden in terms of comparative percentiles? If we build on our quartile logic, we could assume that a negligible burden increases the percentile value by up to 2.5%, minor burden by up to 5%, moderate burden by up to 7.5%, and major burden by up to 10% - essentially multiplying the quartiles by 10. 
+
+@tbl-pifscores below shows the relative impacts on key indicators for the Sudbury Hudson transmission line project using the above logic. These are a subset of the identified key indicators for a transmission project for illustration purposes. Raw values for the indicators, as well as percentile values - statewide and relative to non-Burdened Areas - are shown as well. The latter are highlighted in red if they exceed the 50th percentile. Project Impact Factors (PIFs) for the construction and operation phases, as well as the sum of these, are shown for each indicator, based on EFSB modeling. Note, however, that the PIF values have been modified to be on a quartile basis. Finally, the last column showing PIF Level indicates the overall level of impact. Items highlighted in read indicate a potential "disproportionate adverse effect" because there is negligible or greater impact on an indicator that was already above the 50th percentile for non-Burdened Areas. 
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-pifscores
+
+# table showing application of quartile impact calculations on BA
+# key indicators, statewide median, non-BA median, aggregate impact level, DAE (state)?, DAE (non-BA)
+# use PIF values from EFSB
+PIF <- c("PM25", "DSLPM", "DWATER", "PTRAF", "CancerRisk", "BWPScore", "cleanup_score", "WHPmean", "pctFldArea", "Heatmean")
+cPIF <- c(.08, .08, .08, .08, .17, .17, .17, .17, 0, .08)
+oPIF <- c(.17, .17, -.33, .17, 0, 0, -.17, 0, 0, .17)
+PIFscores <- data.frame(PIF, cPIF, oPIF) %>% 
+  mutate(PIFsum = cPIF+oPIF,
+         PIFlevel = case_when(
+           PIFsum < -.75 ~ "Major Benefits",
+           PIFsum < -.5 & PIFsum >= -.75 ~ "Moderate Benefits",
+           PIFsum < -.25 & PIFsum > -.5 ~ "Minor Benefits",
+           PIFsum < 0 & PIFsum >= -.25 ~ "Negligible Benefits",
+           PIFsum == 0 ~ "No Discernible Impact",
+           PIFsum > 0 & PIFsum <= .25 ~ "Negligible Burdens",
+           PIFsum > .25 & PIFsum <= .5 ~ "Minor Burdens",
+           PIFsum > .5 & PIFsum <= .75 ~ "Moderate Burdens",
+           PIFsum > .75 ~ "Major Burdens"
+         ))
+
+# bring in BAscores and append PIF
+BAscores %>% 
+  inner_join(., PIFscores, by = c("indicator" = "PIF")) %>% 
+  mutate(PIFlevel = cell_spec(PIFlevel, color = case_when(
+    PIFsum > 0 & str_detect(PercentileNBA,"red") ~ "red",
+    .default = "black"))) %>% 
+  kbl("html", escape = FALSE, 
+      caption = "Estimated Project Impacts on Key Indicators", 
+      col.names = c("Indicator", "Raw Value", "Statewide Percentile", 
+                    "non-BA Percentile", "Construction PIF", "Operation PIF", "PIF Sum", "PIF Level")) %>% 
+  kable_styling()
+```
+
+The precision of these values, or the PIF values on which they are based, should not be over interpreted. These values convey a relative impact, based on expert judgement. They are not a substitute for empirically derived values or modeled estimates of absolute impact, such as values derived from air dispersion modeling. As a result, the level of mitigation required for an impacted indicator must be determined in some alternative way. Equally important, the CIA process should allow for situations in which stakeholders can in fact produce empirically based estimates of absolute impacts for key indicators (e.g., PM25 in micrograms per cubic meter).  
 
 
 ### Sensitivity of Baseline Conditions
@@ -369,13 +471,14 @@ bind_cols(select(stateBM, Statistic, Statewide), select(nonBABM, nonBA)) %>%
 ```
 
 
-We can also map the exceedances to explore whethere there are significant differences in the geographic distribution of exceedances. 
+We can also map the exceedances to explore whether there are significant differences in the geographic distribution of exceedances. 
 
 ```{r}
 #| echo: false
 #| warning: false
 #| message: false
 #| label: fig-baselines
+#| eval: false
 
 # create map with comparison of baseline choices
 addLayersControl(
