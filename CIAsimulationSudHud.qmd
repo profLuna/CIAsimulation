@@ -1,0 +1,183 @@
+---
+title: "CIA Simulation - SudHud Transmission Line"
+format: 
+  html:
+    toc: true
+    toc-location: left
+    embed-resources: true
+    keep-md: true
+---
+
+## Introduction and Purpose
+
+This document provides an analysis and simulation of the Cumulative Impact Analysis (CIA) process for clean energy projects as proposed by the Office of Environmental Justice and Equity (OEJE). The simulation focuses on the Sudbbury-Hudson underground transmission line to illustrate the steps in the CIA process and output generated. The rest of the document proceeds stepwise through the CIA process as described by OEJE. 
+
+### Step 1. Identify Specific Geographic Area (SGA) of Project
+
+The first step is to identify the Specific Geographic Area (SGA) of the proposed project. The SGA of a project is defined by the geographic location of the project and its physical footprint, as well as a radius around the project determined by the Energy Facilities Siting Board (EFSB). @tbl-sga below describes the radii of different energy technologies subject to review for CIA.
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-sga
+
+library(tidyverse)
+library(kableExtra)
+# create table
+data.frame(Technology = c("Transmission and Distribution Lines", "Battery Energy Storage System", 
+                          "Substation", "Ground-Mounted PV", 
+                          "Onshore Wind Facility/ Anaerobic Digester > 25MW", "LNG Facility", 
+                          "Pipeline", "Fossil Generating Facility", "Compressor Stations"),
+           Radius = c("1/4 mile", "1 mile", "1/2 mile", "1/2 mile", "1 mile", "1 mile (no Air permit)<br>2 miles (non-Major Air)", "1/2 mile", "2 miles (non-Major)<br>5 miles (Major)", "1 mile (no Air permit)<br>2 miles (non-Major Air)"),
+           Rationale = c("Construction and visual impacts attenuate beyond this radius; emergency response considerations", "Construction and visual impacts attenuate beyond this radius; emergency response considerations", "Construction and visual impacts attenuate beyond this radius; emergency response considerations", "Construction and visual impacts attenuate beyond this radius; emergency response considerations", "Construction and visual impacts attenuate beyond this radius; emergency response considerations", "Construction and visual impacts attenuate beyond this radius; emergency response considerations", "Construction and visual impacts attenuate beyond this radius; emergency response considerations", "Construction and visual impacts attenuate beyond this radius; emergency response considerations", "Construction and visual impacts attenuate beyond this radius; emergency response considerations")) %>% 
+  kbl("html", escape = FALSE, 
+      caption = "Specific Geographic Areas for CIA in EFSB Reviews", 
+      col.names = c("Energy Technology", "Proposed SGA Radius", "Rationale")) %>% 
+  kable_styling()
+```
+
+The Sudbury-Hudson project was an underground transmission line, which would require a 1/4 mile radius around that project.
+
+
+### Step 2. Determine if SGA Overlaps with BA
+
+To determine if the Sudbury-Hudson project is within or near a BA, we examine whether the SGA (including a buffer of the specified radius) overlaps or intersects with "Burdened Areas" (BAs) as identified by the [MassEnviroScreen tool](https://profluna.github.io/MassEnviroScreen/). @fig-sga below is an interactive map showing the transmission line, a 1/4 mile buffer, and the census block groups that intersect with that 1/4 mile buffer. The block group highlighted in red is a BA. 
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| label: fig-sga
+
+# read in libraries
+pacman::p_load(sf, tigris, leaflet, leaflet.extras, leaflet.providers)
+options(tigris_use_cache = TRUE)
+
+# don't use spherical calculations
+sf_use_s2(FALSE)
+
+# load MassEnviroScreen data 
+MES <- readRDS("../MassEnviroScreen/MassEnviroScreen.rds") %>% 
+  replace_na(list(UBA = "No")) %>% 
+  mutate(NAME2 = paste0(str_remove(NAME, ", Middlesex County"),", ", COSUB))
+
+# load project shapefile and create 1/4 mile buffer
+SRT <- st_read("data/Sudbury_rail_rte.shp", quiet = TRUE) %>% 
+  st_make_valid()
+
+# create 1/4 mile buffer around project
+SRTbuff <- st_buffer(SRT, dist = 402.3, 
+                     bOnlyEdges = FALSE, 
+                     endCapStyle = "ROUND", 
+                     singleSide = FALSE) %>% 
+  st_make_valid()
+
+# creat version of SRT in same CRS as MES for mapping
+SRTwgs <- st_transform(SRT, crs = st_crs(MES))
+SRTbuff <- st_transform(SRTbuff, crs = st_crs(MES))
+
+# Identify BGs that intersect with buffer
+BGs <- MES %>% 
+  st_filter(SRTbuff, .predicate = st_intersects)
+
+# Isolate intersecting block groups that are UBA
+UBAbgs <- BGs %>% 
+  filter(UBA == "Yes")
+
+# Map the project SGA and block groups
+# create popup
+BGpopup <- paste0(BGs$NAME, "<br/>",
+                      "<b>Town:</b> ", BGs$COSUB, "<br/>",
+                      BGs$popMES, round(BGs$MassEnviroScore,1), "<br/>",
+                      "<b>Burdened Area? </b>", BGs$UBA,"<br/>",
+                      "<b>Minority: </b>", paste0(round(BGs$minorityPctE,1),"%"),"<br/>",
+                      BGs$popMHI, if_else(!is.na(BGs$medHHincE), paste0("$",formatC(BGs$medHHincE, format = "d", big.mark=",")), "NA"),"<br/>",
+                      BGs$popLEP, paste0(round(BGs$limitEngpctE,1)),"%", "<br/>",
+                     BGs$popLAR, BGs$LARName, "<br/>",
+                     "<b>Health Indicators (% of State Avg):</b>", "<br/>",
+                     BGs$popASTHMA, paste0(round(BGs$pedAsthmaPctSt,1),"%"), "<br/>",
+                     BGs$popBLL, if_else(!is.na(BGs$BLLPctSt), paste0(round(BGs$BLLPctSt,1),"%"), "NA"), "<br/>",
+                     BGs$popLBW, if_else(!is.na(BGs$LBWPctSt), paste0(round(BGs$LBWPctSt,1),"%"), "NA"), "<br/>",
+                     BGs$popPMR, if_else(!is.na(BGs$PMRPctSt), paste0(round(BGs$PMRPctSt,1),"%"), "NA"), "<br/>"
+                     )
+
+# repeat for UBA
+UBAbgpopup <- paste0(UBAbgs$NAME, "<br/>",
+                      "<b>Town:</b> ", UBAbgs$COSUB, "<br/>",
+                      UBAbgs$popMES, round(UBAbgs$MassEnviroScore,1), "<br/>",
+                      "<b>Burdened Area? </b>", UBAbgs$UBA,"<br/>",
+                      "<b>Minority: </b>", paste0(round(UBAbgs$minorityPctE,1),"%"),"<br/>",
+                      UBAbgs$popMHI, if_else(!is.na(UBAbgs$medHHincE), paste0("$",formatC(UBAbgs$medHHincE, format = "d", big.mark=",")), "NA"),"<br/>",
+                      UBAbgs$popLEP, paste0(round(UBAbgs$limitEngpctE,1)),"%", "<br/>",
+                     UBAbgs$popLAR, UBAbgs$LARName, "<br/>",
+                     "<b>Health Indicators (% of State Avg):</b>", "<br/>",
+                     UBAbgs$popASTHMA, paste0(round(UBAbgs$pedAsthmaPctSt,1),"%"), "<br/>",
+                     UBAbgs$popBLL, if_else(!is.na(UBAbgs$BLLPctSt), paste0(round(UBAbgs$BLLPctSt,1),"%"), "NA"), "<br/>",
+                     UBAbgs$popLBW, if_else(!is.na(UBAbgs$LBWPctSt), paste0(round(UBAbgs$LBWPctSt,1),"%"), "NA"), "<br/>",
+                     UBAbgs$popPMR, if_else(!is.na(UBAbgs$PMRPctSt), paste0(round(UBAbgs$PMRPctSt,1),"%"), "NA"), "<br/>"
+                     )
+
+# map out transmission line over block groups
+leaflet() %>% 
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  setView(-71.473858, 42.384783, 12) %>%
+  addPolygons(data = SRTbuff,
+              weight = 1,
+              opacity = 1,
+              color = "blue", 
+              fill = TRUE,
+              fillColor = "blue",
+              fillOpacity = 0.3) %>% 
+  addPolylines(data = SRTwgs,
+               weight = 4,
+               opacity = .7,
+               color = "black") %>% 
+  addPolygons(data = BGs,
+              weight = 2,
+              opacity = .7,
+              color = "orange",
+              fill = TRUE,
+              fillOpacity = 0,
+              dashArray = "3",
+              highlightOptions = highlightOptions(
+                weight = 5,
+                color = "#666",
+                dashArray = "",
+                fillOpacity = 0,
+                bringToFront = TRUE),
+              label = ~NAME2, 
+              popup = BGpopup) %>% 
+    addPolygons(data = UBAbgs,
+              weight = 0.7,
+              opacity = 1,
+              color = "yellow",
+              fill = TRUE,
+              fillColor = "red",
+              fillOpacity = 0.5,
+              dashArray = "3",
+              highlightOptions = highlightOptions(
+                weight = 5,
+                color = "#666",
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = TRUE),
+              label = ~NAME2,
+              popup = UBAbgpopup)
+```
+
+@fig-sga shows that the SGA of the Sudbury-Hudson transmission line intersects with `{r} nrow(BGs)` census block groups, including `{r} nrow(UBAbgs)` block group designated as BA. Based on guidance, the project would require a CIA. 
+
+
+### Step 3. Catalog indicators within SGA
+
+Using data from [MassEnviroScreen](https://profluna.github.io/MassEnviroScreen/), the project applicant must document the values of all the indicators which inform the cumulative impact score. They must highlight all current indicators which exceed the 50th percentile for the specific indicator. This comprehensive inventory establishes the baseline conditions that will be used to assess the project’s incremental impact.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| label: tab-bgs
+
+
+```
+
