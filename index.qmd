@@ -12,7 +12,7 @@ format:
 
 This document provides an analysis and simulation of the Cumulative Impact Analysis (CIA) process for clean energy projects as proposed by the Office of Environmental Justice and Equity (OEJE). The simulation focuses on the Sudbbury-Hudson underground transmission line to illustrate the steps in the CIA process and output generated. The rest of the document proceeds stepwise through the CIA process as described by OEJE. 
 
-### Step 1. Identify Specific Geographic Area (SGA) of Project
+## Step 1. Identify Specific Geographic Area (SGA) of Project
 
 The first step is to identify the Specific Geographic Area (SGA) of the proposed project. The SGA of a project is defined by the geographic location of the project and its physical footprint, as well as a radius around the project determined by the Energy Facilities Siting Board (EFSB). @tbl-sga below describes the radii of different energy technologies subject to review for CIA.
 
@@ -39,7 +39,7 @@ data.frame(Technology = c("Transmission and Distribution Lines", "Battery Energy
 The Sudbury-Hudson project was an underground transmission line, which would require a 1/4 mile radius around that project.
 
 
-### Step 2. Determine if SGA Overlaps with BA
+## Step 2. Determine if SGA Overlaps with BA
 
 To determine if the Sudbury-Hudson project is within or near a BA, we examine whether the SGA (including a buffer of the specified radius) overlaps or intersects with "Burdened Areas" (BAs) as identified by the [MassEnviroScreen tool](https://profluna.github.io/MassEnviroScreen/). @fig-sga below is an interactive map showing the transmission line, a 1/4 mile buffer, and the census block groups that intersect with that 1/4 mile buffer. The block group highlighted in red is a BA. 
 
@@ -187,11 +187,13 @@ leaflet() %>%
               color = "blue", 
               fill = TRUE,
               fillColor = "blue",
-              fillOpacity = 0.3) %>% 
+              fillOpacity = 0.3,
+              group = "1/4 Mile Radius") %>% 
   addPolylines(data = SRTwgs,
                weight = 4,
                opacity = .7,
-               color = "black") %>% 
+               color = "black",
+               group = "Transmission Line") %>% 
   addPolygons(data = BGs,
               weight = 2,
               opacity = .7,
@@ -206,7 +208,8 @@ leaflet() %>%
                 fillOpacity = 0,
                 bringToFront = TRUE),
               label = ~NAME2, 
-              popup = BGpopup) %>% 
+              popup = BGpopup,
+              group = "Census Block Groups") %>% 
     addPolygons(data = UBAbgs,
               weight = 0.7,
               opacity = 1,
@@ -222,23 +225,40 @@ leaflet() %>%
                 fillOpacity = 0.7,
                 bringToFront = TRUE),
               label = ~NAME2,
-              popup = UBAbgpopup)
+              popup = UBAbgpopup,
+              group = "Burdened Area") %>% 
+  addLayersControl(overlayGroups = c("1/4 Mile Radius", "Transmission Line", 
+                                     "Census Block Groups", "Burdened Area"),
+    options = layersControlOptions(
+      collapsed = FALSE,
+      autoZIndex = TRUE))
+  # addLegend(position = "bottomright",  
+  #           colors = "red", 
+  #           opacity = 0.5,
+  #           labels = "Burdened Area",
+  #           layerId = "Burdened Area") %>% 
+  # addLegend(position = "bottomright",  
+  #           colors = "black", 
+  #           opacity = 0.7,
+  #           labels = "Transmission Line",
+  #           layerId = "Transmission Line")
 ```
 
 @fig-sga shows that the SGA of the Sudbury-Hudson transmission line intersects with `{r} nrow(BGs)` census block groups, including `{r} nrow(UBAbgs)` block group designated as BA. Based on guidance, the project would require a CIA. 
 
 
-### Step 3. Catalog Indicators within SGA
+## Step 3. Catalog Indicators within SGA
 
 Using data from [MassEnviroScreen](https://profluna.github.io/MassEnviroScreen/), the project applicant must document the values of all the indicators which inform the cumulative impact score. They must highlight all current indicators which exceed the 50th percentile for the specific indicator. This comprehensive inventory establishes the baseline conditions that will be used to assess the project’s incremental impact.
 
-@tbl-bgs shows the MassEnviroScreen indicator values for the Burdened Area within the SGA. Items in red exceed either the statewide 50th percentile, or the 50th percentile for non-Burdened Areas. 
+@tbl-bgs shows the MassEnviroScreen indicator values for the Burdened Area within the SGA. Items in red exceed the 50th percentile relative to non-Burdened Areas of the state. 
 
 ```{r}
 #| echo: false
 #| warning: false
 #| label: tbl-bgs
 
+library(DT)
 # create table showing raw values and percentiles for BA
 # select relevant variables
 indiRaw <- UBAbgs %>% 
@@ -295,23 +315,40 @@ BAscores <- bind_cols(indiRaw, select(indiNorm, Percentile)) %>%
     # nonBAflag = cell_spec(nonBAflag, color = case_when(
     #   nonBAflag == "Yes" ~ "red",
     #   .default = "black")),
-    PercentileNBA = cell_spec(PercentileNBA, color = case_when(
+    PercentileNBAcol = cell_spec(PercentileNBA, color = case_when(
     PercentileNBA > 50 ~ "red",
     .default = "black")))
 
+# BAscores %>% 
+#   kbl("html", escape = FALSE, 
+#       caption = "MassEnviroScreen Indicators for Burdened Area within SGA", 
+#       col.names = c("Indicator", "Raw Value", "Statewide Percentile", 
+#                     "non-Burdened Area Percentile")) %>% 
+#   kable_styling() %>% 
+#   scroll_box(width = "100%", height = "500px")
+
+# BAscores %>% 
+#   select(-Percentile) %>% 
+#   kbl("html", escape = FALSE, 
+#       caption = "MassEnviroScreen Indicators for Burdened Area within SGA", 
+#       col.names = c("Indicator", "Raw Value", "Percentile Relative to non-Burdened Areas of the State")) %>% 
+#   kable_styling() %>% 
+#   scroll_box(width = "80%", height = "500px")
+
 BAscores %>% 
-  kbl("html", escape = FALSE, 
-      caption = "MassEnviroScreen Indicators for Burdened Area within SGA", 
-      col.names = c("Indicator", "Raw Value", "Statewide Percentile", 
-                    "non-Burdened Area Percentile")) %>% 
-  kable_styling() %>% 
-  scroll_box(width = "100%", height = "500px")
+  select(-Percentile, -PercentileNBAcol) %>% 
+  datatable(., rownames = FALSE, 
+            caption = "MassEnviroScreen Indicators for Burdened Area within SGA", 
+            colnames = c("Indicator" = "indicator", "Raw Value" = "RawValue", 
+            "Percentile Relative to non-Burdened Areas of the State" = "PercentileNBA")) %>% 
+  formatStyle(columns = "Percentile Relative to non-Burdened Areas of the State", 
+              color = styleInterval(c(50),c("black", "red")))
 ```
 
 
-### Step 4. Identify Impacts on Key Indicators
+## Step 4. Identify Impacts on Key Indicators
 
-Using the list of relevant, technology-specific indicators established by the EFSB, the project applicant must assess and document the anticipated impact of the proposed project on each indicator within the SGA. The project applicant must determine whether the project will exacerbate any indicator that already exceeds the 50th percentile statewide threshold or cause any additional indicator to exceed the 50th percentile threshold. If either condition is met, the impact is considered a disproportionate adverse effect for that indicator.
+Using the list of relevant, technology-specific indicators established by the EFSB, the project applicant must assess and document the anticipated impact of the proposed project on each indicator within the SGA. The project applicant must determine whether the project will exacerbate any indicator that already exceeds the 50th percentile threshold or cause any additional indicator to exceed the 50th percentile threshold. If either condition is met, the impact is considered a disproportionate adverse effect for that indicator.
 
 @tbl-kpi below lists the key indicators by technology type as identified by the EFSB.
 
@@ -322,32 +359,117 @@ Using the list of relevant, technology-specific indicators established by the EF
 
 library(readxl)
 
+# read_xlsx("data/CIA Indicators by Technology 08-01-25.xlsx", 
+#                  sheet = "Cumul Ind by E-Tech", skip = 6) %>% 
+#   filter(!is.na(`Impact Category`) & `Impact Category` != "Site Suitability") %>% 
+#   select(-`Comments (Rationale for Inclusion)`) %>% 
+#   kbl("html", escape = FALSE, 
+#       caption = "Key Indicators by Technology Type", 
+#       col.names = c("Impact Category", "Sub-Category", "Indicator", 
+#                     "Clean Transmission and Distribution", "Clean Energy Generation",
+#                     "Clean Energy Storage", "Fossil Fuel (Legacy Facilities) - All Types")) %>% 
+#   kable_styling() %>% 
+#   scroll_box(width = "100%", height = "500px")
+
+
 read_xlsx("data/CIA Indicators by Technology 08-01-25.xlsx", 
                  sheet = "Cumul Ind by E-Tech", skip = 6) %>% 
   filter(!is.na(`Impact Category`) & `Impact Category` != "Site Suitability") %>% 
   select(-`Comments (Rationale for Inclusion)`) %>% 
-  kbl("html", escape = FALSE, 
-      caption = "Key Indicators by Technology Type", 
-      col.names = c("Impact Category", "Sub-Category", "Indicator", 
-                    "Clean Transmission and Distribution", "Clean Energy Generation",
-                    "Clean Energy Storage", "Fossil Fuel (Legacy Facilities) - All Types")) %>% 
-  kable_styling() %>% 
-  scroll_box(width = "100%", height = "500px")
+  datatable(., rownames = FALSE, caption = "Key Indicators by Technology Type")
 ```
 
-In the absence of accepted methods for estimating or modeling expected impacts on key indicators, one way of quantifying the level of potential impact is to use expert judgment as exemplified by the Project Impact Factor (PIF) proposed by EFSB. At its broadest level, the PIF strategy conceptualizes impacts on a continuum, ranging from "major burdens" to "no discernible impact" to "major benefits." These impacts are compensable, such that benefits can mathematically offset burdens, and vice versa. This approach can be further subdivided into two phases: the construction phase and the operation phase. The operation phase is weighted more heavily because the effects endure over a longer time period. While the determination of level of impact (e.g., "moderate" or "major" burden) should be based on expert judgment, the numerical value assigned to a given level of impact is essentially arbitrary. However, given the four levels of impact proposed by EFSB, a logical approach to quantification would be to use quartiles - 1, 0.75, 0.5, and 0.25. If the construction phase is conceived as having half the impact of the operation phase, these quartile values can be broken into complementary values, such that the construction phase value is half that of the operation phase value, and the sum of both equals the respective quartile. To achieve this, Construction phase values are computed as 1/3 of the quartile values for a given level, and Operation phase values are computed as 2/3 of the quartile value for a given level. The latter ensure that the construction phase values are one-half that of the operation phase values, and the sum of these complementary values adds up to the quartile value of a given level (see @tbl-impact). 
+### 4a. Determine Project Impact Level
 
-phaseC = 1/3 * quartile level value
+The impact on each key indicator is assessed using a qualitative ranking of project impact, which is based on guidelines provided by OEJE and EFSB. Project impact ranks can be one of the following:
 
-phaseO = 2/3 * quartile level value
+- No Discernible Impact
+- Negligible Burdens
+- Minor Burdens
+- Moderate Burdens
+- Major Burdens
 
-phaseC + phaseO = quartile value
+The project proponent will be provided with clear and concise guidance on assigning a project impact rank. Guidance should be provided for evaluating impacts on each unique indicator. 
+
+
+### 4b. Apply Decision Rules to Determine if Disproportionate Adverse Effect
+
+Whether a project's impact on a key indicator rises to the level of a disproportionate adverse effect is determined based on decision rule matrix as exemplified below in @tbl-dae. 
 
 ```{r}
 #| echo: false
 #| warning: false
-#| label: tbl-impact
+#| label: tbl-dae
 
+data.frame(indicator = c(rep(">50",4), rep("40-49",4), rep("30-39",4), rep("<30",4)), 
+           PIF = rep(c("Negligible", "Minor", "Moderate", "Major"),4),
+           DAE = c("No", "Yes", "Yes", "Yes", "No", "No", "Yes", "Yes","No", "No", "No", "Yes", rep("No",4))) %>% 
+  kbl("html", escape = FALSE, 
+      caption = "Decision Matrix for Project Impacts", 
+      col.names = c("Indicator Percentile", "Project Impact Rank", "Disproportionate Adverse Effect?")) %>% 
+  kable_styling() %>% 
+  collapse_rows(columns = 1, valign = "middle")
+```
+
+
+In the case of the current project simulation for the Sudbury Hudson transmission line, the project's projected impacts on key indicators show that it would not have a disproportionate adverse effect on any indicators.
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-pifscores
+
+# table showing application of quartile impact calculations on BA
+# key indicators, statewide median, non-BA median, aggregate impact level, DAE (state)?, DAE (non-BA)
+# use PIF values from EFSB
+PIF <- c("PM25", "DSLPM", "DWATER", "PTRAF", "CancerRisk", "BWPScore", "cleanup_score", "WHPmean", "pctFldArea", "Heatmean")
+cPIF <- c(.08, .08, .08, .08, .17, .17, .17, .17, 0, .08)
+oPIF <- c(.17, .17, -.33, .17, 0, 0, -.17, 0, 0, .17)
+PIFscores <- data.frame(PIF, cPIF, oPIF) %>% 
+  mutate(PIFsum = cPIF+oPIF,
+         PIFlevel = case_when(
+           PIFsum < -.75 ~ "Major Benefits",
+           PIFsum < -.5 & PIFsum >= -.75 ~ "Moderate Benefits",
+           PIFsum < -.25 & PIFsum > -.5 ~ "Minor Benefits",
+           PIFsum < 0 & PIFsum >= -.25 ~ "Negligible Benefits",
+           PIFsum == 0 ~ "No Discernible Impact",
+           PIFsum > 0 & PIFsum <= .25 ~ "Negligible Burdens",
+           PIFsum > .25 & PIFsum <= .5 ~ "Minor Burdens",
+           PIFsum > .5 & PIFsum <= .75 ~ "Moderate Burdens",
+           PIFsum > .75 ~ "Major Burdens"
+         ))
+
+# bring in BAscores and append PIF
+BAscores %>% 
+  inner_join(., PIFscores, by = c("indicator" = "PIF")) %>% 
+  mutate(DAE = case_when(
+      PercentileNBA > 50 & PIFlevel %in% c("Minor Burdens", "Moderate Burdens", "Major Burdens") ~ "Yes",
+      PercentileNBA >= 40 & PercentileNBA <= 49 & (PIFlevel == "Moderate Burdens" | PIFlevel == "Major Burdens") ~ "Yes",
+      PercentileNBA >= 30 & PercentileNBA <= 39 & PIFlevel == "Major Burdens" ~ "Yes",
+      .default = "No"
+    )) %>% 
+  select(indicator, RawValue, PercentileNBAcol, PIFlevel, DAE) %>% 
+  kbl("html", escape = FALSE, 
+      caption = "Estimated Project Impacts on Key Indicators", 
+      col.names = c("Indicator", "Raw Value", "Percentile Relative to non-Burdened Areas of the State", "Project Impact Rank", "Disproportionate Adverse Effect?")) %>% 
+  kable_styling()
+```
+
+<!-- In the absence of accepted methods for estimating or modeling expected impacts on key indicators, one way of quantifying the level of potential impact is to use expert judgment as exemplified by the Project Impact Factor (PIF) proposed by EFSB. At its broadest level, the PIF strategy conceptualizes impacts on a continuum, ranging from "major burdens" to "no discernible impact" to "major benefits." These impacts are compensable, such that benefits can mathematically offset burdens, and vice versa. This approach can be further subdivided into two phases: the construction phase and the operation phase. The operation phase is weighted more heavily because the effects endure over a longer time period. While the determination of level of impact (e.g., "moderate" or "major" burden) should be based on expert judgment, the numerical value assigned to a given level of impact is essentially arbitrary. However, given the four levels of impact proposed by EFSB, a logical approach to quantification would be to use quartiles - 1, 0.75, 0.5, and 0.25. If the construction phase is conceived as having half the impact of the operation phase, these quartile values can be broken into complementary values, such that the construction phase value is half that of the operation phase value, and the sum of both equals the respective quartile. To achieve this, Construction phase values are computed as 1/3 of the quartile values for a given level, and Operation phase values are computed as 2/3 of the quartile value for a given level. The latter ensure that the construction phase values are one-half that of the operation phase values, and the sum of these complementary values adds up to the quartile value of a given level (see @tbl-impact).  -->
+
+<!-- phaseC = 1/3 * quartile level value -->
+
+<!-- phaseO = 2/3 * quartile level value -->
+
+<!-- phaseC + phaseO = quartile value -->
+
+```{r}
+#| echo: false
+#| warning: false
+#| eval: false
+
+
+#label: tbl-impact
 # table illustrating concept of PIF by quartiles with half-weighting for construction phase
 data.frame(impact = c("Major Benefits", "Moderate Benefits", "Minor Benefits", 
                       "Negligible Benefits", "No Discernible Project Benefits or Burdens", 
@@ -363,22 +485,23 @@ phaseO = c(rev(round(seq(from = 0.25, to = 1, by = 0.25)*(2/3),2)*-1), 0,
   kable_styling()
 ```
 
-According to OEJE guidance, "A disproportionate adverse effect occurs when the project exacerbates already high-impact indicators or pushes others beyond critical thresholds." This statement can be interpreted to mean the following:
+<!-- According to OEJE guidance, "A disproportionate adverse effect occurs when the project exacerbates already high-impact indicators or pushes others beyond critical thresholds." This statement can be interpreted to mean the following: -->
 
-1. If a project adds to a burden that is already above the critical threshold in a Burdened Area (e.g., 50th percentile), it is by definition exacerbating an already high-impact indicator - a disproportionate adverse effect
-2. If a project pushes or raises an indicator beyond a critical threshold in a Burdened Area (e.g., 50th percentile), it creates a disproportionate adverse effect
+<!-- 1. If a project adds to a burden that is already above the critical threshold in a Burdened Area (e.g., 50th percentile), it is by definition exacerbating an already high-impact indicator - a disproportionate adverse effect -->
+<!-- 2. If a project pushes or raises an indicator beyond a critical threshold in a Burdened Area (e.g., 50th percentile), it creates a disproportionate adverse effect -->
 
-Item 1 is essentially a threshold situation. Adding burden to an indicator that already exceeds the critical threshold in a Burdened Area is ipso facto a disproportionate adverse effect. In other words, the project is adding inequitable levels of burden on a key indicator to an already overburdened community. If we are reluctant to accept such trigger, we could declare that impacts must have a "minor" or greater burden to trigger such a determination. 
+<!-- Item 1 is essentially a threshold situation. Adding burden to an indicator that already exceeds the critical threshold in a Burdened Area is ipso facto a disproportionate adverse effect. In other words, the project is adding inequitable levels of burden on a key indicator to an already overburdened community. If we are reluctant to accept such trigger, we could declare that impacts must have a "minor" or greater burden to trigger such a determination.  -->
 
-Item 2 is more complicated. How do we quantify the incremental impact of a burden in terms of comparative percentiles? If we build on our quartile logic, we could assume that a negligible burden increases the percentile value by up to 2.5%, minor burden by up to 5%, moderate burden by up to 7.5%, and major burden by up to 10% - essentially multiplying the quartiles by 10. 
+<!-- Item 2 is more complicated. How do we quantify the incremental impact of a burden in terms of comparative percentiles? If we build on our quartile logic, we could assume that a negligible burden increases the percentile value by up to 2.5%, minor burden by up to 5%, moderate burden by up to 7.5%, and major burden by up to 10% - essentially multiplying the quartiles by 10.  -->
 
-@tbl-pifscores below shows the relative impacts on key indicators for the Sudbury Hudson transmission line project using the above logic. These are a subset of the identified key indicators for a transmission project for illustration purposes. Raw values for the indicators, as well as percentile values - statewide and relative to non-Burdened Areas - are shown as well. The latter are highlighted in red if they exceed the 50th percentile. Project Impact Factors (PIFs) for the construction and operation phases, as well as the sum of these, are shown for each indicator, based on EFSB modeling. Note, however, that the PIF values have been modified to be on a quartile basis. Finally, the last column showing PIF Level indicates the overall level of impact. Items highlighted in red indicate a potential "disproportionate adverse effect" because there is negligible or greater impact on an indicator that was already above the 50th percentile for non-Burdened Areas. 
+<!-- @tbl-pifscores below shows the relative impacts on key indicators for the Sudbury Hudson transmission line project using the above logic. These are a subset of the identified key indicators for a transmission project for illustration purposes. Raw values for the indicators, as well as percentile values - statewide and relative to non-Burdened Areas - are shown as well. The latter are highlighted in red if they exceed the 50th percentile. Project Impact Factors (PIFs) for the construction and operation phases, as well as the sum of these, are shown for each indicator, based on EFSB modeling. Note, however, that the PIF values have been modified to be on a quartile basis. Finally, the last column showing PIF Level indicates the overall level of impact. Items highlighted in red indicate a potential "disproportionate adverse effect" because there is negligible or greater impact on an indicator that was already above the 50th percentile for non-Burdened Areas.  -->
 
 ```{r}
 #| echo: false
 #| warning: false
-#| label: tbl-pifscores
+#| eval: false
 
+# label: tbl-pifscoresOLD
 # table showing application of quartile impact calculations on BA
 # key indicators, statewide median, non-BA median, aggregate impact level, DAE (state)?, DAE (non-BA)
 # use PIF values from EFSB
@@ -412,25 +535,26 @@ BAscores %>%
   kable_styling()
 ```
 
-The precision of these values, or the PIF values on which they are based, should not be over interpreted. These values convey a relative impact, based on expert judgement. They are not a substitute for empirically derived values or modeled estimates of absolute impact, such as values derived from air dispersion modeling. As a result, the level of mitigation required for an impacted indicator must be determined in some alternative way. Equally important, the CIA process should allow for situations in which stakeholders can in fact produce empirically based estimates of absolute impacts for key indicators (e.g., PM25 in micrograms per cubic meter).  
+<!-- The precision of these values, or the PIF values on which they are based, should not be over interpreted. These values convey a relative impact, based on expert judgement. They are not a substitute for empirically derived values or modeled estimates of absolute impact, such as values derived from air dispersion modeling. As a result, the level of mitigation required for an impacted indicator must be determined in some alternative way. Equally important, the CIA process should allow for situations in which stakeholders can in fact produce empirically based estimates of absolute impacts for key indicators (e.g., PM25 in micrograms per cubic meter).   -->
 
 
-### Sensitivity of Baseline Conditions
+<!-- ### Sensitivity of Baseline Conditions -->
 
-Following the proposed regulations by OEJE, there are two ways to set baseline conditions for determining a disproportionate adverse effect:
+<!-- Following the proposed regulations by OEJE, there are two ways to set baseline conditions for determining a disproportionate adverse effect: -->
 
-- comparison against the statewide 50th percentile for a given indicator
-- comparison against the 50th percentile for non-Burdened Areas
+<!-- - comparison against the statewide 50th percentile for a given indicator -->
+<!-- - comparison against the 50th percentile for non-Burdened Areas -->
 
-We can explore the significance of these choices by looking at the frequency of 50th percentile exceedances for Burdened Areas in MassEnviroScreen. In other words, how often do Burdened Areas in MassEnviroScreen exceed the 50th percentile when the statewide baseline is used? How often do they exceed the 50th percentile when the baseline is based on non-Burdened Areas?
+<!-- We can explore the significance of these choices by looking at the frequency of 50th percentile exceedances for Burdened Areas in MassEnviroScreen. In other words, how often do Burdened Areas in MassEnviroScreen exceed the 50th percentile when the statewide baseline is used? How often do they exceed the 50th percentile when the baseline is based on non-Burdened Areas? -->
 
-@tbl-baseline shows statistics on frequency of exceedances using these different baselines. Values indicate the number of exceedances by census block group. For example, using the statewide baseline, the smallest number of exceedances for a burdened area block group is 4 exceedances, and maximum is 27. In comparison, using the non-Burdened Area baseline, the smallest number of exceedances is 6, and the maximum is also 27. 
+<!-- @tbl-baseline shows statistics on frequency of exceedances using these different baselines. Values indicate the number of exceedances by census block group. For example, using the statewide baseline, the smallest number of exceedances for a burdened area block group is 4 exceedances, and maximum is 27. In comparison, using the non-Burdened Area baseline, the smallest number of exceedances is 6, and the maximum is also 27.  -->
 
 ```{r}
 #| echo: false
 #| warning: false
-#| label: tbl-baseline
+#| eval: false
 
+# label: tbl-baseline
 # create table showing stats on frequency of exceedances based on benchmark
 stateBM <- MES %>% 
   st_drop_geometry() %>% 
@@ -471,15 +595,15 @@ bind_cols(select(stateBM, Statistic, Statewide), select(nonBABM, nonBA)) %>%
 ```
 
 
-We can also map the exceedances to explore whether there are significant differences in the geographic distribution of exceedances. 
+<!-- We can also map the exceedances to explore whether there are significant differences in the geographic distribution of exceedances.  -->
 
 ```{r}
 #| echo: false
 #| warning: false
 #| message: false
-#| label: fig-baselines
 #| eval: false
 
+# label: fig-baselines
 # create map with comparison of baseline choices
 addLayersControl(
     # baseGroups are toggle radio buttons; only 1 at at time
