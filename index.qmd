@@ -350,46 +350,45 @@ BAscores %>%
 
 Using the list of relevant, technology-specific indicators established by the EFSB, the project applicant must assess and document the anticipated impact of the proposed project on each indicator within the SGA. The project applicant must determine whether the project will exacerbate any indicator that already exceeds the 50th percentile threshold or cause any additional indicator to exceed the 50th percentile threshold. If either condition is met, the impact is considered a disproportionate adverse effect for that indicator.
 
-@tbl-kpi below lists the key indicators by technology type as identified by the EFSB.
+@tbl-kpi below lists the key indicators by technology type as identified by the EFSB. 'X' indicates a facility’s construction and/or operation has the ability to directly impact the listed indicator.
 
+::: column-page
 ```{r}
 #| echo: false
 #| warning: false
 #| label: tbl-kpi
+#| out-width: "100%"
 
 library(readxl)
 
-# read_xlsx("data/CIA Indicators by Technology 08-01-25.xlsx", 
-#                  sheet = "Cumul Ind by E-Tech", skip = 6) %>% 
-#   filter(!is.na(`Impact Category`) & `Impact Category` != "Site Suitability") %>% 
-#   select(-`Comments (Rationale for Inclusion)`) %>% 
-#   kbl("html", escape = FALSE, 
-#       caption = "Key Indicators by Technology Type", 
-#       col.names = c("Impact Category", "Sub-Category", "Indicator", 
-#                     "Clean Transmission and Distribution", "Clean Energy Generation",
-#                     "Clean Energy Storage", "Fossil Fuel (Legacy Facilities) - All Types")) %>% 
-#   kable_styling() %>% 
-#   scroll_box(width = "100%", height = "500px")
-
+font.size <- "10pt" # font size for datatable in combination with JS solution below
 
 read_xlsx("data/CIA Indicators by Technology 08-01-25.xlsx", 
                  sheet = "Cumul Ind by E-Tech", skip = 6) %>% 
   filter(!is.na(`Impact Category`) & `Impact Category` != "Site Suitability") %>% 
   select(-`Comments (Rationale for Inclusion)`) %>% 
-  datatable(., rownames = FALSE, caption = "Key Indicators by Technology Type")
+  datatable(., rownames = FALSE, caption = "Key Indicators by Technology Type. 'X' indicates facility’s construction and/or operation has the ability to directly impact the listed indicator.", 
+            options = list(scrollX = TRUE, 
+                           initComplete = htmlwidgets::JS(
+          "function(settings, json) {",
+          paste0("$(this.api().table().container()).css({'font-size': '", font.size, "'});"),
+          "}")), 
+          width = "100%")
 ```
+:::
 
 ### 4a. Determine Project Impact Level
 
 The impact on each key indicator is assessed using a qualitative ranking of project impact, which is based on guidelines provided by OEJE and EFSB. Project impact ranks can be one of the following:
 
-- No Discernible Impact
-- Negligible Burdens
-- Minor Burdens
-- Moderate Burdens
-- Major Burdens
+- Benefit
+- No Impact
+- Negligible Impact
+- Minor Burden
+- Moderate Burden
+- Major Burden
 
-The project proponent will be provided with clear and concise guidance on assigning a project impact rank. Guidance should be provided for evaluating impacts on each unique indicator. 
+Project Impact Ranks will be determined for Construction phase and Operation phase separately. The project proponent will be provided with clear and concise guidance on assigning a Project Impact Rank. Guidance should be provided for evaluating impacts on each unique indicator. 
 
 
 ### 4b. Apply Decision Rules to Determine if Disproportionate Adverse Effect
@@ -401,9 +400,9 @@ Whether a project's impact on a key indicator rises to the level of a disproport
 #| warning: false
 #| label: tbl-dae
 
-data.frame(indicator = c(rep(">50",4), rep("40-49",4), rep("30-39",4), rep("<30",4)), 
-           PIF = rep(c("Negligible", "Minor", "Moderate", "Major"),4),
-           DAE = c("No", "Yes", "Yes", "Yes", "No", "No", "Yes", "Yes","No", "No", "No", "Yes", rep("No",4))) %>% 
+data.frame(indicator = c(rep(">=75",5), rep("50-74",5), rep("40-49",5), rep("<40",5)), 
+           PIF = rep(c("No Impact", "Negligible", "Minor", "Moderate", "Major"),4),
+           DAE = c("No", "Yes", "Yes", "Yes", "Yes", "No", "No", "Yes", "Yes", "Yes", "No", "No", "No", "Yes", "Yes", "No", "No", "No", "No", "Yes")) %>% 
   kbl("html", escape = FALSE, 
       caption = "Decision Matrix for Project Impacts", 
       col.names = c("Indicator Percentile", "Project Impact Rank", "Disproportionate Adverse Effect?")) %>% 
@@ -412,7 +411,7 @@ data.frame(indicator = c(rep(">50",4), rep("40-49",4), rep("30-39",4), rep("<30"
 ```
 
 
-In the case of the current project simulation for the Sudbury Hudson transmission line, the project's projected impacts on key indicators show that it would not have a disproportionate adverse effect on any indicators.
+In the case of the current project simulation for the Sudbury Hudson transmission line, the project's projected impacts on key indicators show that it would have a disproportionate adverse effect on several indicators (DWATER, cleanup_score, and Heatmean) as a result of the high non-Burdened Area percentile values for those indicators in combination with the project impact ranks for the construction and/or operations phases. 
 
 ```{r}
 #| echo: false
@@ -426,32 +425,58 @@ PIF <- c("PM25", "DSLPM", "DWATER", "PTRAF", "CancerRisk", "BWPScore", "cleanup_
 cPIF <- c(.08, .08, .08, .08, .17, .17, .17, .17, 0, .08)
 oPIF <- c(.17, .17, -.33, .17, 0, 0, -.17, 0, 0, .17)
 PIFscores <- data.frame(PIF, cPIF, oPIF) %>% 
-  mutate(PIFsum = cPIF+oPIF,
+  mutate(cPIFlevel = case_when(
+           cPIF < -.75 ~ "Major Benefit",
+           cPIF < -.5 & cPIF >= -.75 ~ "Moderate Benefit",
+           cPIF < -.25 & cPIF > -.5 ~ "Minor Benefit",
+           cPIF < 0 & cPIF >= -.25 ~ "Negligible Benefit",
+           cPIF == 0 ~ "No Impact",
+           cPIF > 0 & cPIF <= .25 ~ "Negligible Burden",
+           cPIF > .25 & cPIF <= .5 ~ "Minor Burden",
+           cPIF > .5 & cPIF <= .75 ~ "Moderate Burden",
+           cPIF > .75 ~ "Major Burden"
+         ),
+         oPIFlevel = case_when(
+           oPIF < -.75 ~ "Major Benefit",
+           oPIF < -.5 & oPIF >= -.75 ~ "Moderate Benefit",
+           oPIF < -.25 & oPIF > -.5 ~ "Minor Benefit",
+           oPIF < 0 & oPIF >= -.25 ~ "Negligible Benefit",
+           oPIF == 0 ~ "No Impact",
+           oPIF > 0 & oPIF <= .25 ~ "Negligible Burden",
+           oPIF > .25 & oPIF <= .5 ~ "Minor Burden",
+           oPIF > .5 & oPIF <= .75 ~ "Moderate Burden",
+           oPIF > .75 ~ "Major Burden"
+         ),
+         PIFsum = cPIF+oPIF,
          PIFlevel = case_when(
-           PIFsum < -.75 ~ "Major Benefits",
-           PIFsum < -.5 & PIFsum >= -.75 ~ "Moderate Benefits",
-           PIFsum < -.25 & PIFsum > -.5 ~ "Minor Benefits",
-           PIFsum < 0 & PIFsum >= -.25 ~ "Negligible Benefits",
-           PIFsum == 0 ~ "No Discernible Impact",
-           PIFsum > 0 & PIFsum <= .25 ~ "Negligible Burdens",
-           PIFsum > .25 & PIFsum <= .5 ~ "Minor Burdens",
-           PIFsum > .5 & PIFsum <= .75 ~ "Moderate Burdens",
-           PIFsum > .75 ~ "Major Burdens"
+           PIFsum < -.75 ~ "Major Benefit",
+           PIFsum < -.5 & PIFsum >= -.75 ~ "Moderate Benefit",
+           PIFsum < -.25 & PIFsum > -.5 ~ "Minor Benefit",
+           PIFsum < 0 & PIFsum >= -.25 ~ "Negligible Benefit",
+           PIFsum == 0 ~ "No Impact",
+           PIFsum > 0 & PIFsum <= .25 ~ "Negligible Burden",
+           PIFsum > .25 & PIFsum <= .5 ~ "Minor Burden",
+           PIFsum > .5 & PIFsum <= .75 ~ "Moderate Burden",
+           PIFsum > .75 ~ "Major Burden"
          ))
 
 # bring in BAscores and append PIF
 BAscores %>% 
   inner_join(., PIFscores, by = c("indicator" = "PIF")) %>% 
   mutate(DAE = case_when(
-      PercentileNBA > 50 & PIFlevel %in% c("Minor Burdens", "Moderate Burdens", "Major Burdens") ~ "Yes",
-      PercentileNBA >= 40 & PercentileNBA <= 49 & (PIFlevel == "Moderate Burdens" | PIFlevel == "Major Burdens") ~ "Yes",
-      PercentileNBA >= 30 & PercentileNBA <= 39 & PIFlevel == "Major Burdens" ~ "Yes",
-      .default = "No"
-    )) %>% 
-  select(indicator, RawValue, PercentileNBAcol, PIFlevel, DAE) %>% 
+      PercentileNBA >= 75 & (cPIFlevel %in% c("Negligible Burden", "Minor Burden", "Moderate Burden", "Major Burden") | oPIFlevel %in% c("Negligible Burden", "Minor Burden", "Moderate Burden", "Major Burden")) ~ "Yes",
+      PercentileNBA >= 50 & PercentileNBA <= 74 & (cPIFlevel %in% c("Minor Burden", "Moderate Burden", "Major Burden") | oPIFlevel %in% c("Minor Burden", "Moderate Burden", "Major Burden")) ~ "Yes",
+      PercentileNBA >= 40 & PercentileNBA <= 49 & (cPIFlevel %in% c("Moderate Burden", "Major Burden") | oPIFlevel %in% c("Moderate Burden", "Major Burden")) ~ "Yes",
+      PercentileNBA < 40 & (cPIFlevel == "Major Burden" | oPIFlevel == "Major Burden") ~ "Yes",
+      .default = "No"),
+      DAE = cell_spec(DAE, color = case_when(
+    DAE == "Yes" ~ "red",
+    .default = "black"))
+    ) %>% 
+  select(indicator, RawValue, PercentileNBAcol, cPIFlevel, oPIFlevel, PIFlevel, DAE) %>% 
   kbl("html", escape = FALSE, 
       caption = "Estimated Project Impacts on Key Indicators", 
-      col.names = c("Indicator", "Raw Value", "Percentile Relative to non-Burdened Areas of the State", "Project Impact Rank", "Disproportionate Adverse Effect?")) %>% 
+      col.names = c("Indicator", "Raw Value", "Non-Burdened Areas Percentile", "Construction Phase Impact", "Operations Phase Impact", "Project Impact Rank", "Disproportionate Adverse Effect?")) %>% 
   kable_styling()
 ```
 
